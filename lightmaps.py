@@ -30,6 +30,9 @@ HOLD_TIME = 701
 MAX_MAGNIFIER = 229
 tdim = 256
 
+MIN_ZOOM = 2
+MAX_ZOOM = 18
+
 def qHash(point):
     '''Qt doesn't implement a qHash() for QPoint.'''
     return (point.x(),point.y())
@@ -76,7 +79,7 @@ class SlippyMap(QtCore.QObject):
         self.m_tilesRect = QtCore.QRect()
         self.m_tilePixmaps = {}
 
-    def invalidate(self):
+    def invalidate(self, emitSignal=True):
         if self.width <= 0 or self.height <= 0:
             return
 
@@ -107,7 +110,8 @@ class SlippyMap(QtCore.QObject):
         if self.m_url.isEmpty():
             self.download()
 
-        self.updated.emit(QtCore.QRect(0, 0, self.width, self.height))
+        if emitSignal:
+            self.updated.emit(QtCore.QRect(0, 0, self.width, self.height))
 
     def render(self, painter, rect):
         for x in xrange(self.m_tilesRect.width()+1):
@@ -127,10 +131,26 @@ class SlippyMap(QtCore.QObject):
         self.longitude = longitudeFromTile(center.x(), self.zoom)
         self.invalidate()
 
+    def zoomTo(self, zoomlevel):
+        self.zoom = zoomlevel
+        self.invalidate(False)
+
+    def zoomIn(self):
+        if self.zoom < MAX_ZOOM:
+            self.zoomTo(self.zoom+1)
+
+    def zoomOut(self):
+        if self.zoom > MIN_ZOOM:
+            self.zoomTo(self.zoom-1)
+
     def handleNetworkData(self, reply):
         img = QtGui.QImage()
         tp = reply.request().attribute(QtNetwork.QNetworkRequest.User).toPoint()
         url = reply.url()
+
+        ## debug: check if reply was cached
+        #fromCache = reply.attribute(QtNetwork.QNetworkRequest.SourceIsFromCacheAttribute).toBool()
+
         if not reply.error():
             if not img.load(reply, ""):
                 img = QtGui.QImage()
@@ -144,29 +164,28 @@ class SlippyMap(QtCore.QObject):
         self.download()
 
     def download(self):
-        grab = QtCore.QPoint(0, 0)
-        for x in xrange(self.m_tilesRect.width()+1):
-            for y in xrange(self.m_tilesRect.height()+1):
-                tp = self.m_tilesRect.topLeft() + QtCore.QPoint(x, y)
-                if not qHash(tp) in self.m_tilePixmaps:
-                    grab = tp
-                    break
-        if grab == QtCore.QPoint(0, 0):
+        try:
+            for x in xrange(self.m_tilesRect.width()+1):
+                for y in xrange(self.m_tilesRect.height()+1):
+                    tp = self.m_tilesRect.topLeft() + QtCore.QPoint(x, y)
+                    if not qHash(tp) in self.m_tilePixmaps:
+                        raise StopIteration()
+
             self.m_url = QtCore.QUrl()
             # purge unused spaces
             bound = self.m_tilesRect.adjusted(-2, -2, 2, 2)
             for hash in self.m_tilePixmaps.keys():
                 if not bound.contains(QtCore.QPoint(hash[0],hash[1])):
                     del self.m_tilePixmaps[hash]
-            return
 
-        path = QtCore.QString("http://tile.openstreetmap.org/%1/%2/%3.png")
-        self.m_url = QtCore.QUrl(path.arg(self.zoom).arg(grab.x()).arg(grab.y()))
-        request = QtNetwork.QNetworkRequest()
-        request.setUrl(self.m_url)
-        request.setRawHeader("User-Agent", "(PyQt) LightMaps 1.0")
-        request.setAttribute(QtNetwork.QNetworkRequest.User, QtCore.QVariant(grab))
-        self.m_manager.get(request)
+        except StopIteration:
+            path = QtCore.QString("http://tile.openstreetmap.org/%1/%2/%3.png")
+            self.m_url = QtCore.QUrl(path.arg(self.zoom).arg(tp.x()).arg(tp.y()))
+            request = QtNetwork.QNetworkRequest()
+            request.setUrl(self.m_url)
+            request.setRawHeader("User-Agent", "(PyQt) LightMaps 1.0")
+            request.setAttribute(QtNetwork.QNetworkRequest.User, QtCore.QVariant(tp))
+            self.m_manager.get(request)
 
     def tileRect(self, tp):
         t = tp - self.m_tilesRect.topLeft()
@@ -211,15 +230,16 @@ class LightMaps(QtGui.QWidget):
         self.update(rect)
 
     def activateZoom(self):
-        self.zoomed = True
-        self.tapTimer.stop()
-        self.m_largeMap.zoom = self.m_normalMap.zoom + 1
-        self.m_largeMap.width = self.m_normalMap.width * 2
-        self.m_largeMap.height = self.m_normalMap.height * 2
-        self.m_largeMap.latitude = self.m_normalMap.latitude
-        self.m_largeMap.longitude = self.m_normalMap.longitude
-        self.m_largeMap.invalidate()
-        self.update()
+        if self.m_normalMap.zoom < MAX_ZOOM:
+            self.zoomed = True
+            self.tapTimer.stop()
+            self.m_largeMap.zoom = self.m_normalMap.zoom + 1
+            self.m_largeMap.width = self.m_normalMap.width * 2
+            self.m_largeMap.height = self.m_normalMap.height * 2
+            self.m_largeMap.latitude = self.m_normalMap.latitude
+            self.m_largeMap.longitude = self.m_normalMap.longitude
+            self.m_largeMap.invalidate()
+            self.update()
 
     def resizeEvent(self, event):
         self.m_normalMap.width = self.width()
@@ -366,6 +386,14 @@ class LightMaps(QtGui.QWidget):
                 if delta != QtCore.QPoint(0, 0):
                     self.dragPos += delta
                     self.update()
+
+    def wheelEvent(self, event):
+        if self.zoomed:
+            self.zoomed = False
+        if event.delta() > 0:
+            self.m_normalMap.zoomIn()
+        else:
+            self.m_normalMap.zoomOut()
 
 
 
