@@ -1,7 +1,7 @@
 Attribution
 ============
-Ported from <http://qt.gitorious.org/qt-labs/graphics-dojo/trees/master/lightmaps>
-See also <http://labs.trolltech.com/blogs/2009/08/04/openstreetmap-and-qt-and-s60/>
+Ported from http://qt.gitorious.org/qt-labs/graphics-dojo/trees/master/lightmaps
+See also http://labs.trolltech.com/blogs/2009/08/04/openstreetmap-and-qt-and-s60/
 
 
 License
@@ -24,11 +24,13 @@ chmod +x lightmaps.py
 Key bindings
 =============
 Mouse buttons (drag): pan
-Left mouse button (hold): zoom
 Left, right, up, down key: pan
-Z key, select key: toggle zoom
+Left mouse button (hold): magnifier zoom
+Z key, select key: toggle magnifier zoom
+Mouse wheel, plus and minus keys: zoom in/out
 
 
 Known issues
 =============
-Night mode is not working, error message: "QPainter::setCompositionMode: Blend modes not supported on device" (probably PyQt issue, as it works in C++)
+- Night mode is not working, error message: "QPainter::setCompositionMode: Blend modes not supported on device" (probably PyQt issue, as it works in C++)
+- Viewport is not restricted (relevant on low zoom levels)
