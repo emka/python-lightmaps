@@ -369,6 +369,10 @@ class LightMaps(QtGui.QWidget):
             elif event.key() == QtCore.Qt.Key_Z or event.key() == QtCore.Qt.Key_Select:
                 self.dragPos = QtCore.QPoint(self.width() / 2, self.height() / 2)
                 self.activateZoom()
+            elif event.key() == QtCore.Qt.Key_Plus:
+                self.m_normalMap.zoomIn()
+            elif event.key() == QtCore.Qt.Key_Minus:
+                self.m_normalMap.zoomOut()
         else:
             if event.key() == QtCore.Qt.Key_Z or event.key() == QtCore.Qt.Key_Select:
                 self.zoomed = False
